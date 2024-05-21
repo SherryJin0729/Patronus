@@ -1,47 +1,99 @@
 import streamlit as st
+from PIL import Image
+import io
+import numpy as np
+import torch
+from diffusers import StableDiffusionControlNetPipeline, ControlNetModel, UniPCMultistepScheduler
+from diffusers.utils import load_image
+from controlnet_aux import OpenposeDetector
+from openai import OpenAI
 
-st.title("My Streamlit App")
+# Initialize OpenAI client
+client = OpenAI(api_key="sk-proj-0cD3oLBfTMTsUGnvkwNyT3BlbkFJKC4h3kc1hAwukFVC3JkQ")
 
-st.sidebar.title("Sidebar")
-st.sidebar.write("You can add widgets here")
+# Title and description
+st.title('Image Upload and Display App')
+st.write("""
+This app allows you to upload an image file, processes it, and displays the input and output images in a formatted way.
+""")
 
+# File upload
+uploaded_file = st.file_uploader("Choose an image file", type=["jpg", "jpeg", "png", "svg", "webp", "bmp"])
 
-user_input = st.text_input("Enter some text:")
-
-
-if st.button("Submit"):
-    st.write("You entered:", user_input)
-
-
-option = st.selectbox("Select an option:", ["Option 1", "Option 2", "Option 3"])
-st.write("You selected:", option)
-
-
-slider_value = st.slider("Select a range:", 0, 100, 50)
-st.write("Slider value:", slider_value)
-
-
-uploaded_file = st.file_uploader("Choose a file")
 if uploaded_file is not None:
-    st.write("Uploaded file:", uploaded_file.name)
+    # Read the uploaded file
+    input_image = Image.open(uploaded_file)
+    
+    # Display the input image
+    st.write("### Input Image")
+    st.image(input_image, caption="Uploaded Image", use_column_width=True)
+    
+    # Save the uploaded image to a buffer
+    buf = io.BytesIO()
+    input_image.save(buf, format="PNG")
+    buf.seek(0)
+    
+    # Define the prompt function
+    def prompt_animal(image_buffer):
+        response = client.chat.completions.create(
+            model="gpt-4-turbo",
+            messages=[
+                {
+                    "role": "user",
+                    "content": "RESPOND IN 1 WORD. Imagine you're an animal sorter aiding in spiritual discovery. Based on the image provided, what animal resonates with the person's essence? Please offer a single-word response. This animal should embody traits or qualities that align with the individual's character or aspirations. Avoid animals with negative connotations. Example responses include dog, cat, tiger, lion, bear, fish, shark, deer. YOUR RESPONSE SHOULD BE 1 WORD, RESEMBLING ONE OF THESE ANIMALS"
+                }
+            ],
+            max_tokens=10,
+            files={"file": image_buffer}
+        )
+        return response.choices[0].message.content
 
+    animal = prompt_animal(buf)
+    
+    # Load the ControlNet and other models
+    openpose = OpenposeDetector.from_pretrained('lllyasviel/ControlNet')
+    controlnet_conditioning_scale = 0.5
+    controlnet = ControlNetModel.from_pretrained(
+        "lllyasviel/sd-controlnet-openpose", torch_dtype=torch.float16
+    )
 
-placeholder = st.empty()
+    image = load_image(input_image)
+    image = openpose(image)
 
+    pipe = StableDiffusionControlNetPipeline.from_pretrained(
+        "runwayml/stable-diffusion-v1-5", controlnet=controlnet, safety_checker=None, torch_dtype=torch.float16
+    )
+    pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
+    pipe.enable_model_cpu_offload()
 
-if st.button("Update Placeholder"):
-    placeholder.write("The placeholder has been updated!")
+    prompt = f'{animal}, ultra realistic, NO HUMAN, Replace BUT NOT ADD OR DELETE the human with a {animal}. Some emotion'
+    negative_prompt = 'medium quality, unrealistic, distortion, unreasonable lighting, sketches, human'
 
+    images = pipe(
+        prompt, negative_prompt=negative_prompt, image=image, controlnet_conditioning_scale=controlnet_conditioning_scale, num_inference_steps=30
+    ).images
 
-import matplotlib.pyplot as plt
+    # Process the first image (assuming only one image is generated)
+    output_image = images[0]
 
-fig, ax = plt.subplots()
-ax.plot([1, 2, 3, 4], [10, 20, 25, 30])
-st.pyplot(fig)
+    # Convert the image to a format that can be displayed by Streamlit
+    if isinstance(output_image, np.ndarray):
+        output_image = Image.fromarray(output_image)
 
+    # Display the output image using Streamlit
+    st.write("### Output Image")
+    st.image(output_image, caption="Processed Image", use_column_width=True)
 
-with st.expander("Expand for more options"):
-    st.write("Additional content can go here")
-
-# Main content
-st.write("Welcome to your Streamlit app. Customize it to fit your needs!")
+    # Provide a download link for the processed image
+    st.write("### Download Processed Image")
+    buf = io.BytesIO()
+    output_image.save(buf, format="PNG")
+    byte_im = buf.getvalue()
+    st.download_button(
+        label="Download Image",
+        data=byte_im,
+        file_name="processed_image.png",
+        mime="image/png"
+    )
+else:
+    st.write("Please upload an image file to proceed.")
