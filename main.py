@@ -8,6 +8,17 @@ from openai import OpenAI
 import numpy as np
 import torch
 
+import PIL.Image
+import requests
+from PIL import Image
+from io import BytesIO
+from carvekit.api.interface import Interface
+from carvekit.ml.wrap.fba_matting import FBAMatting
+from carvekit.ml.wrap.tracer_b7 import TracerUniversalB7
+from carvekit.pipelines.postprocessing import MattingMethod
+from carvekit.pipelines.preprocessing import PreprocessingStub
+from carvekit.trimap.generator import TrimapGenerator
+
 # Initialize OpenAI client
 client = OpenAI(api_key="sk-proj-0cD3oLBfTMTsUGnvkwNyT3BlbkFJKC4h3kc1hAwukFVC3JkQ")
 
