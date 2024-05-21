@@ -32,7 +32,67 @@ if uploaded_file is not None:
     buf = io.BytesIO()
     input_image.save(buf, format="PNG")
     buf.seek(0)
+
+    #convert image to url
+    def upload_image_to_imgbb(image_path, api_key):
+        with open(image_path, 'rb') as file:
+            response = requests.post(
+                'https://api.imgbb.com/1/upload',
+                data={'key': api_key},
+                files={'image': file}
+            )
+        return response.json()['data']['url']
+
+    api_key = 'c18450c786749500447fe5fc6f072418'
+
     
+    # the url of the uploaded image
+
+    image_url = upload_image_to_imgbb(uploaded_file.name, api_key)
+
+    # Check doc strings for more information
+    seg_net = TracerUniversalB7(device='cpu',
+                batch_size=1)
+
+    fba = FBAMatting(device='cpu',
+                    input_tensor_size=2048,
+                    batch_size=1)
+
+    trimap = TrimapGenerator()
+
+    preprocessing = PreprocessingStub()
+
+    postprocessing = MattingMethod(matting_module=fba,
+                                trimap_generator=trimap,
+                                device='cpu')
+
+    interface = Interface(pre_pipe=preprocessing,
+                        post_pipe=postprocessing,
+                        seg_pipe=seg_net)
+
+    response = requests.get(image_url)
+    response.raise_for_status()  # check for HTTP errors
+
+    image = Image.open(BytesIO(response.content))
+
+
+    cat_wo_bg = interface([image])[0]
+    cat_wo_bg.save('2.png')
+
+    image_path = '/content/2.png'
+
+    url = upload_image_to_imgbb(image_path, api_key)
+    print('Image URL:', url)
+    from IPython.display import display, Image
+
+    image1_url = url
+
+    # Display Image
+    display(Image(url=image1_url))
+
+    image = load_image(input_image)
+    image = openpose(image)
+
     # Define the prompt function
     def prompt_animal(image_buffer:io.BytesIO):
         import base64
