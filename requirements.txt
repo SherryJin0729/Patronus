@@ -1,0 +1,10 @@
+streamlit==1.30.0
+streamlit-image-select
+accelerate
+transformers
+safetensors
+opencv-python
+diffusers
+controlnet_aux
+mediapipe
+openai
