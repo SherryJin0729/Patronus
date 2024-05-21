@@ -1,12 +1,12 @@
 import streamlit as st
 from PIL import Image
 import io
-import numpy as np
-import torch
 from diffusers import StableDiffusionControlNetPipeline, ControlNetModel, UniPCMultistepScheduler
 from diffusers.utils import load_image
 from controlnet_aux import OpenposeDetector
 from openai import OpenAI
+import numpy as np
+import torch
 
 # Initialize OpenAI client
 client = OpenAI(api_key="sk-proj-0cD3oLBfTMTsUGnvkwNyT3BlbkFJKC4h3kc1hAwukFVC3JkQ")
@@ -35,16 +35,23 @@ if uploaded_file is not None:
     
     # Define the prompt function
     def prompt_animal(image_buffer):
+        import base64
+        image_url = b"data:image/png;base64,"+base64.b64encode(image_buffer)
         response = client.chat.completions.create(
             model="gpt-4-turbo",
             messages=[
                 {
                     "role": "user",
-                    "content": "RESPOND IN 1 WORD. Imagine you're an animal sorter aiding in spiritual discovery. Based on the image provided, what animal resonates with the person's essence? Please offer a single-word response. This animal should embody traits or qualities that align with the individual's character or aspirations. Avoid animals with negative connotations. Example responses include dog, cat, tiger, lion, bear, fish, shark, deer. YOUR RESPONSE SHOULD BE 1 WORD, RESEMBLING ONE OF THESE ANIMALS"
+                    "content": [{"type":"text", "text": "RESPOND IN 1 WORD. Imagine you're an animal sorter aiding in spiritual discovery. Based on the image provided, what animal resonates with the person's essence? Please offer a single-word response. This animal should embody traits or qualities that align with the individual's character or aspirations. Avoid animals with negative connotations. Example responses include dog, cat, tiger, lion, bear, fish, shark, deer. YOUR RESPONSE SHOULD BE 1 WORD, RESEMBLING ONE OF THESE ANIMALS"},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": image_url
+                                    }
+                                }]
                 }
             ],
             max_tokens=10,
-            files={"file": image_buffer}
         )
         return response.choices[0].message.content
 
