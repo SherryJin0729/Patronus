@@ -34,21 +34,23 @@ if uploaded_file is not None:
     buf.seek(0)
     
     # Define the prompt function
-    def prompt_animal(image_buffer):
+    def prompt_animal(image_buffer:io.BytesIO):
         import base64
-        image_url = b"data:image/png;base64,"+base64.b64encode(image_buffer)
+        image_url = "data:image/png;base64,"+base64.b64encode(image_buffer.getbuffer()).decode()
         response = client.chat.completions.create(
             model="gpt-4-turbo",
             messages=[
                 {
                     "role": "user",
-                    "content": [{"type":"text", "text": "RESPOND IN 1 WORD. Imagine you're an animal sorter aiding in spiritual discovery. Based on the image provided, what animal resonates with the person's essence? Please offer a single-word response. This animal should embody traits or qualities that align with the individual's character or aspirations. Avoid animals with negative connotations. Example responses include dog, cat, tiger, lion, bear, fish, shark, deer. YOUR RESPONSE SHOULD BE 1 WORD, RESEMBLING ONE OF THESE ANIMALS"},
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": image_url
-                                    }
-                                }]
+                    "content": [
+                        {"type":"text", "text": "RESPOND IN 1 WORD. Imagine you're an animal sorter aiding in spiritual discovery. Based on the image provided, what animal resonates with the person's essence? Please offer a single-word response. This animal should embody traits or qualities that align with the individual's character or aspirations. Avoid animals with negative connotations. Example responses include dog, cat, tiger, lion, bear, fish, shark, deer. YOUR RESPONSE SHOULD BE 1 WORD, RESEMBLING ONE OF THESE ANIMALS"},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": image_url
+                                }
+                            }
+                    ]
                 }
             ],
             max_tokens=10,
